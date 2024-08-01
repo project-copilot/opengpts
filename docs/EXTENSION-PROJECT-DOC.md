@@ -1,146 +1,78 @@
-## OpenGPTs Model Comparison Module Proof of Concept (POC)
+## OpenGPTs RAG Bot Evaluation with G-Eval: Design Document
 
-### Project Overview
+### 1. Project Goal
 
-This Proof of Concept (POC) demonstrates a basic Model Comparison Module for the OpenGPTs project. The module's purpose is to provide a framework for comparing the performance of different Large Language Models (LLMs). This specific POC focuses on comparing Google Gemini and OpenAI GPT-4, but the underlying design can be extended to other LLMs.
+This project aims to extend the OpenGPTs UI to facilitate the evaluation of RAG Bots using the G-Eval framework. Users will be able to define custom evaluation criteria, provide questions and expected answers, and obtain a comprehensive evaluation score for their RAG Bot's performance.
 
-**Relation to OpenGPTs**:
+### 2. System Design
 
-OpenGPTs aims to provide an open-source alternative to OpenAI's GPTs and Assistants API. A robust Model Comparison Module would be a valuable addition, enabling users to evaluate and select the most suitable LLM for their specific needs and use cases.
+#### 2.1 Frontend UI Extension
 
-**Specific Use Case**:
+- **G-Eval Configuration Panel:**
+    - A new panel in the OpenGPTs UI, accessible when creating or editing a RAG Bot, dedicated to configuring G-Eval parameters.
+    - Fields for:
+        - **Metric Name:** Descriptive name for the evaluation metric (e.g., "Factual Accuracy").
+        - **Evaluation Criteria:** Free-text description of the evaluation aspects (e.g., "Assess factual correctness based on the context provided.").
+        - **Evaluation Steps (optional):** A list of explicit steps the LLM should follow during evaluation. If not provided, G-Eval will generate steps based on the criteria.
+        - **Threshold (optional):** Minimum score (0-1) for a test case to pass, defaults to 0.5.
+        - **LLM Model (optional):** Selection from available LLM models, defaults to the RAG Bot's LLM.
+        - **Strict Mode (optional):** Checkbox to enable binary scoring (1 for perfect, 0 otherwise) and override threshold to 1.
+        - **Verbose Mode (optional):** Checkbox to print intermediate evaluation steps to the console.
 
-This POC addresses a simplified scenario:
+- **Test Case Definition:**
+    - A section within the panel to define multiple test cases.
+    - Each test case will include:
+        - **Question:** The question to be posed to the RAG Bot.
+        - **Expected Answer:** The ideal answer based on the provided context.
+        - **Context (optional):** Additional context relevant to the question.
+        - **Additional Inputs (optional):** Any other input parameters relevant to the evaluation criteria (as defined in G-Eval).
 
-1. **File Loading**: The script loads a single text file containing information.
-2. **Predefined Questions**: Three predefined questions are asked to both Gemini and GPT-4, prompting them to extract or infer information from the loaded file.
-3. **Response Comparison**: The models' responses are compared using two metrics:
-    - **ROUGE-1 Score**: Measures the overlap of unigrams (single words) between the models' responses and a predefined "ideal" answer.
-    - **Simplified G-Eval**: Assesses the quality of the responses based on basic criteria, providing a holistic evaluation.
+- **Evaluation Results Display:**
+    - Upon running the evaluation, a new section will display the results.
+    - It will show:
+        - Overall evaluation score (0-1) for the entire set of test cases.
+        - Individual scores and reasons for each test case.
+        - Option to toggle verbose mode to view intermediate steps.
 
-Both ROUGE-1 and the simplified G-Eval implementation leverage the `deepeval` library, showcasing its capabilities for automated evaluation of LLMs.
+#### 2.2 Backend Integration
 
-### System Design
+- **API Endpoints:**
+    - New endpoints to:
+        - Save G-Eval configurations associated with a RAG Bot.
+        - Retrieve G-Eval configurations for a RAG Bot.
+        - Trigger evaluation execution.
+        - Fetch evaluation results.
 
-**Components**:
+- **G-Eval Execution:**
+    - Utilize the `deepeval` library to instantiate and execute G-Eval metrics.
+    - Leverage existing LangChain infrastructure to:
+        - Run the RAG Bot on each test case question.
+        - Use the selected LLM model to evaluate the RAG Bot's output based on the defined criteria, steps, and additional inputs.
 
-The POC consists of the following core components:
+- **Data Storage:**
+    - Store G-Eval configurations in the database linked to the corresponding RAG Bot.
+    - Store evaluation results, including individual scores and reasons, in the database linked to the evaluation run.
 
-- **File Loader**: Loads the content of a single text file.
-- **Question Provider**: Holds the three predefined questions.
-- **Model Interfaces**: Simple interfaces for interacting with Google Gemini and OpenAI GPT-4.
-- **ROUGE-1 Calculator**: Calculates the ROUGE-1 score using `deepeval`.
-- **Simplified G-Eval Evaluator**: Implements a basic version of G-Eval using `deepeval`.
-- **Result Comparator**: Processes the scores from both metrics and presents the comparison results.
+### 3. Workflow
 
-**Data Flow**:
+1. **Configuration:** The user creates a RAG Bot using OpenGPTs UI and defines the G-Eval parameters and test cases.
+2. **Storage:** The backend saves the G-Eval configuration to the database.
+3. **Evaluation Trigger:** The user triggers the evaluation process from the UI.
+4. **Run Execution:** The backend runs the RAG Bot on each test case question, capturing the actual output.
+5. **G-Eval Measurement:** The backend uses the selected LLM model and the G-Eval configuration to evaluate each test case, generating a score and a reason.
+6. **Results Storage:** The backend stores the evaluation results in the database.
+7. **Results Display:** The frontend fetches and displays the results to the user.
 
-1. The File Loader reads the input text file.
-2. The Question Provider supplies the predefined questions to both model interfaces.
-3. The Model Interfaces send the questions to Gemini and GPT-4, receiving their respective responses.
-4. The ROUGE-1 Calculator and Simplified G-Eval Evaluator compute their scores based on the models' responses and predefined "ideal" answers or evaluation criteria.
-5. The Result Comparator compiles the scores, compares them, and presents the final comparison results.
+### 4. Potential Issues and Considerations
 
-### Key Components Design
+- **Performance:** Running multiple evaluations with large LLMs can be computationally expensive. Consider implementing:
+    - Asynchronous task processing to prevent blocking the UI.
+    - Caching mechanisms for LLM responses and retrieval results.
+- **User Interface Complexity:** The additional configuration options and test case definitions could make the UI more complex. Focus on intuitive design and clear documentation to ensure usability.
+- **Evaluation Criteria Flexibility:** G-Eval's flexibility in defining evaluation criteria relies on natural language understanding. Thorough testing and clear instructions are crucial to ensure accurate and consistent evaluations.
+- **Bias in LLM Evaluation:** The LLM used for G-Eval could introduce its own biases into the evaluation process. Carefully select the LLM model and be aware of its limitations.
 
-**a. File Loading Mechanism**:
+### 5. Conclusion
 
-- Uses a simple file reader (`with open(...) as f: ...`) to load the entire content of a single text file into memory.
-
-**b. Predefined Questions**:
-
-- Stored as a list of strings within the script. Example:
-  ```python
-  questions = [
-      "What is the main topic of this document?",
-      "List three key facts mentioned in the text.",
-      "What is the author's opinion on the subject?",
-  ]
-  ```
-
-**c. Simple Interfaces for Gemini and GPT-4**:
-
-- Basic functions using the respective libraries for interacting with the LLMs. 
-  - They send a question and receive the model's response.
-  - Authentication and other complexities are handled outside the scope of this POC.
-
-**d. ROUGE-1 Score Calculation using deepeval**:
-
-- Utilizes the `deepeval` library's `rouge_1` function to compute the ROUGE-1 score:
-  ```python
-  from deepeval.metrics import rouge_1
-  rouge_score = rouge_1(model_response, ideal_answer)
-  ```
-
-**e. Simplified G-Eval Implementation using deepeval**:
-
-- Implements a streamlined version of G-Eval using `deepeval`.
-- **Basic Criteria**: Defined directly within the script as simple rules or checks. Example:
-  ```python
-  from deepeval.criteria import fact_consistency, relevance, coherence
-  criteria = [fact_consistency, relevance, coherence]
-  ```
-- **Evaluation Process**: The `deepeval` library's `evaluate` function is used to assess the model's response against each criterion.
-- **Simplified G-Eval Metric**: A composite score is calculated based on the individual criterion scores, providing an overall quality assessment. Example:
-  ```python
-  from deepeval.evaluator import Evaluator
-  evaluator = Evaluator(criteria)
-  g_eval_score = evaluator.evaluate(model_response, input_text)
-  ```
-
-**f. Basic Result Comparison Logic**:
-
-- The script compares the ROUGE-1 and simplified G-Eval scores for both Gemini and GPT-4, presenting the comparison in a simple format (e.g., printing to the console).
-
-### Evaluation Metrics
-
-**ROUGE-1 Scoring**:
-
-- `deepeval`'s `rouge_1` function calculates the ROUGE-1 score, which measures the overlap of unigrams (single words) between the model's response and a predefined "ideal" answer. A higher score indicates better agreement between the two.
-
-**Simplified G-Eval Framework**:
-
-- This POC implements a simplified version of G-Eval using `deepeval`. 
-  - It defines basic criteria like fact consistency, relevance, and coherence directly within the script.
-  - `deepeval`'s `evaluate` function evaluates the model's response against these criteria.
-  - A composite score is then calculated by aggregating the individual criterion scores. This simplified metric reflects the overall quality of the response in terms of the defined criteria.
-
-### Implementation Details
-
-- The POC is implemented as a single Python script.
-- It leverages several libraries:
-  - `langchain` for interacting with LLMs and managing prompts.
-  - `deepeval` for automated evaluation metrics.
-- Installing `deepeval`:
-  ```bash
-  pip install deepeval
-  ```
-
-### Usage Guide
-
-1. Install the required libraries: `pip install langchain deepeval`
-2. Ensure you have valid API keys for accessing both Google Gemini and OpenAI GPT-4.
-3. Place your input text file (e.g., `input.txt`) in the same directory as the script.
-4. Run the Python script.
-
-**Example Input**:
-
-- A text file containing information.
-
-**Example Output**:
-
-- Console output displaying the ROUGE-1 and simplified G-Eval scores for both Gemini and GPT-4, along with a basic comparison summary.
-
-### Future Expansion
-
-- **Advanced deepeval Features**: Future articles can leverage more sophisticated features of `deepeval`, like:
-    - Customizing criteria with specific weights.
-    - Implementing more complex G-Eval criteria using the `Criteria` class.
-    - Utilizing the `Metric` class for defining and calculating custom metrics beyond ROUGE-1.
-- **Expanded Use Cases**: Beyond single file analysis, the module can be extended to:
-    - Handle multiple files and datasets.
-    - Integrate with OpenGPTs's existing cognitive architectures.
-    - Support a wider range of LLMs and evaluation metrics.
-
-This POC lays the foundation for a powerful Model Comparison Module within OpenGPTs, empowering users to make informed decisions about LLM selection by leveraging the capabilities of the `deepeval` library for automated and insightful evaluation.
+Integrating G-Eval into OpenGPTs provides a powerful tool for developers to evaluate and improve their RAG Bots. By allowing customized evaluation criteria and detailed test case definitions, this project empowers users to assess their bots' performance with greater precision and flexibility, ultimately contributing to the development of more robust and effective RAG applications.
 
